@@ -113,10 +113,10 @@ def norm(perc, goal,p = 2):
             perc[i] =0
         else: 
             perc[i] = round(perc[i],4)
-    return np.linalg.norm(np.subtract(perc,goal),ord =p)
+    return np.linalg.norm(np.subtract(perc,goal),ord =p) 
 
 def use_best_value(q,i,m,goal):
-    temp = [0,0,0,0]
+    temp = [0,0,0,0,0,0,0]
     mini = 0
     for ii in range(4): # change to 4 to allow skipping
         if ii != 3:
@@ -131,44 +131,133 @@ def use_best_value(q,i,m,goal):
     else:
         q[i] = 255
     print(i,"dist = ", temp[mini])
-    
+
+def cond(step,dist,N):
+    r = np.random.rand()
+    sum = 0.5
+    sum += 1-(N-step)**2/(N**2)/2
+    #return False
+    if r > sum:
+        return True
+    return False
 
 
-def solve(q,m,goal):
+def use_best_value2(q,i,m,goal,step,N):
+    temp = [[0,0,0,0],[0,0,0,0]]
+    minj = 0
+    sminj = 0
+    minjj = 0
+    sminjj = 0
+    for j in range(2):
+        for jj in range(4):
+            if jj != 3:
+                q[i] = jj
+            else:
+                q[jj] = 255
+            temp[j][jj] = norm(calulate_all_percentages(q,m),goal)
+            if temp[j][jj] < temp[minj][minjj]:
+                sminj = minj
+                minj =j
+                sminjj =minjj
+                minjj = jj
+        m[i]= not m[i] 
+    #if cond(step,temp[minj][minjj],N):
+    #    m[i]= not m[i]
+    if minjj != 3:
+        q[i] = minjj
+    else:
+        q[i] = 255
+    if minj == 1:
+        m[i]= not m[i]
+    print(i,"dist = ", temp[minj][minjj])
+
+
+def solve(q,m,goal,step,N):
     temp = []
     for i in range(totalthesis):
-        use_best_value(q,i,m,goal)
+        use_best_value2(q,i,m,goal,step,N)
     return (q,m)
 
-(qg,m) =  hundred_percent_n_partys([1,4])
-m = np.zeros(totalthesis,"bool")#set_multipliers(7)
-goal = calulate_all_percentages(qg,m)
+def switch_n_bools(m,n):
+    for i in range(n):
+        r = np.random.randint(0,len(m))
+        m[r] = not m[r]
+
+def better_norm(perc, goal,p = 2):
+    for i in range(totalparty):
+        if goal[i] == 0:
+            perc[i] =0
+        else: 
+            perc[i] = round(perc[i],4)
+    return np.linalg.norm(np.subtract(perc,goal),ord =p) 
+
+def better_solve(q,m,goal,maxIt=1000,tol = 0):
+    change_amount = 5
+    for i in range(maxIt):
+        perc = calulate_all_percentages(q,m)
+        dist = np.absolute(np.subtract(perc,goal))
+        maxi = np.argmax(dist)
+        mini = np.argmin(dist)
+        r = np.random.randint(0,totalthesis)
+        temp = 0
+        for ii in range(totalthesis):
+            ii = (r+i)%38
+            if clean[maxi][ii] != clean[mini][ii]:
+                [pmax,pmin] = [calulate_percentages(q,m,maxi),calulate_percentages(q,m,maxi)]
+                temp = q[ii]
+                q[ii] = clean[mini][ii]
+                [primemax,primemin] = [calulate_percentages(q,m,maxi),calulate_percentages(q,m,maxi)]
+                qperc = calulate_all_percentages(q,m)
+                if abs(primemax-goal[maxi]) < abs(pmax-goal[maxi]) and abs(primemin-goal[mini]) < abs(pmin-goal[mini]):
+                    break
+                else:
+                    q[ii] = temp
+                
+        print(better_norm(calulate_all_percentages(q,m),goal))
+    return (q,m)
+
+        #en = int(((maxIt-i)**2/(maxIt**2))/change_amount*totalthesis)
+        #for ii in range(en):
+        #    r = np.random.randint(0,totalthesis)
+        #    for iii in range(10):
+        #        if clean[maxi][r] != clean[mini][r]:# and q[r] != clean[mini][r]:
+        #            q[r] = clean[mini][r]
+        #            break
+        #        r = (r+1)%totalthesis
+        #print(norm(calulate_all_percentages(q,m),goal))
+    #return (q,m)
+
+#(qg,mg) =  hundred_percent_n_partys([1,4])
+qg = random_beliefs()
+mg = random_multipliers()
+goal = calulate_all_percentages(qg,mg)
 for g in goal:
     g = round(g,4)
 
-q = np.array(clean[15],copy=True)
+q = np.array(clean[1],copy=True)
 m = np.zeros(totalthesis,"bool") 
 
-(qprime,mprime) = solve(np.array(q,copy=True),m,goal)
+N = 30
+qprime = np.array(q,copy=True)
+mprime = np.array(m,copy=True)
+
+#for i in range(N):
+#    (qprime,mprime) = solve(np.array(qprime,copy=True),np.array(mprime,copy=True),goal,i,N)
+#    print(i,"--------------")
+#    for i in range(totalthesis):
+#        print(qprime[i],mprime[i],qg[i],mg[i])
+#
+#    perc = calulate_all_percentages(qprime,mprime)
+#    for i in range(totalparty):
+#        print(round(goal[i]*100,1),round(perc[i]*100,1))
+#    
+#    switch_n_bools(m,int((totalthesis-totalthesis*(N-i)**2/(N**2))/3))
+
+(qprime,mprime) = better_solve(np.array(qprime,copy=True),np.array(mprime,copy=True),goal)
 
 
-for i in range(totalthesis):
-    print(qprime[i],qg[i])
-
-perc = calulate_all_percentages(qprime,mprime)
-for i in range(totalparty):
-    print(round(goal[i]*100,1),round(perc[i]*100,1))
 
 
-(qprimeprime,mprime) = solve(np.array(qprime,copy=True),m,goal)
-
-
-for i in range(totalthesis):
-    print(qprimeprime[i],qg[i])
-
-perc = calulate_all_percentages(qprimeprime,mprime)
-for i in range(totalparty):
-    print(round(goal[i]*100,1),round(perc[i]*100,1))
 
 
 
