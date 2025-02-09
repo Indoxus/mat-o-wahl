@@ -5,8 +5,8 @@ from time import sleep
 
 totalthesis = 38
 
-driver = webdriver.Chrome()
 def fill_out(questions,multiplier):
+    driver = webdriver.Chrome()
     driver.get("https://www.wahl-o-mat.de/bundestagswahl2025/app/main_app.html")
     sleep(2)
     driver.find_element(By.XPATH,"/html/body/div[1]/div/main/section/div/div[1]/button").click()

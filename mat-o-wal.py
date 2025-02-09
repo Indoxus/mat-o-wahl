@@ -20,6 +20,9 @@ for r in csv.iterrows():
     clean[int(r[1]["Partei: Nr."])-1,int(r[1]["These: Nr."])-1] = maptonumbers(r[1]["Position: Position"])
 print(clean)
 
+def get_clean():
+    return np.array(clean,copy=True)
+
 def hundred_percent_n_partys(partys):
     q = np.array(clean[partys[0]],copy=True)
     m = np.zeros(totalthesis,dtype="bool")
@@ -27,7 +30,7 @@ def hundred_percent_n_partys(partys):
         for ii in range(totalthesis):
             if q[ii] != clean[partys[i+1],ii]:
                 q[ii] = 255
-                print(ii)
+                print("diffrent belief @",ii)
     return (q,m)
 
 def check_for_point_seperation(partys):
@@ -50,10 +53,13 @@ def calulate_percentages(q,m,party):
             maxi += 2 * (1+m[i])
     return sum/maxi
 
-def calulate_all_percentages(q,m):
+def calulate_all_percentages(q,m,filter = []):
     out = []
     for i in range(totalparty):
-        out.append(calulate_percentages(q,m,i))
+        if i in filter:
+            out.append(0)
+        else:
+            out.append(calulate_percentages(q,m,i))
     return out
 
 def print_all_percentages(q,m):
@@ -203,12 +209,17 @@ def better_solve(q,m,goal,maxIt=1000,tol = 0):
         for ii in range(totalthesis):
             ii = (r+i)%38
             if clean[maxi][ii] != clean[mini][ii]:
-                [pmax,pmin] = [calulate_percentages(q,m,maxi),calulate_percentages(q,m,maxi)]
+                [pmax,pmin] = [calulate_percentages(q,m,maxi),calulate_percentages(q,m,mini)]
                 temp = q[ii]
                 q[ii] = clean[mini][ii]
-                [primemax,primemin] = [calulate_percentages(q,m,maxi),calulate_percentages(q,m,maxi)]
+                [primemax,primemin] = [calulate_percentages(q,m,maxi),calulate_percentages(q,m,mini)]
                 qperc = calulate_all_percentages(q,m)
                 if abs(primemax-goal[maxi]) < abs(pmax-goal[maxi]) and abs(primemin-goal[mini]) < abs(pmin-goal[mini]):
+                    temp2 = m[ii]
+                    m[ii] = not m[ii]
+                    mprime = calulate_all_percentages(q,m)
+                    if better_norm(qperc,goal) < better_norm(mprime,goal):
+                        m[ii] = temp2
                     break
                 else:
                     q[ii] = temp
@@ -227,7 +238,94 @@ def better_solve(q,m,goal,maxIt=1000,tol = 0):
         #print(norm(calulate_all_percentages(q,m),goal))
     #return (q,m)
 
-#(qg,mg) =  hundred_percent_n_partys([1,4])
+def calculate_percentages_prime(thesis,q,m,qprime,mprime,leave_out = []):
+    temp1 = q[thesis]
+    temp2 = m[thesis]
+    q[thesis] = qprime
+    m[thesis] = mprime
+    out = calulate_all_percentages(q,m,leave_out)
+    q[thesis] = temp1
+    m[thesis] = temp2
+    return out
+
+def random_permute(q,m,n):
+    for i in range(n):
+        ind = np.random.randint(0,totalthesis)
+        print("perumtation @ ",ind)
+        q[ind] = np.random.choice([0,1,2,0,1,2,0,1,2,255])
+        m[ind] = np.random.choice([True, False,False,False])
+    return (q,m)
+
+def morebruteforcesolver(q,m,goal):
+    zwischen = np.zeros((totalthesis,2,4),dtype = "float32")
+    mprime = False
+    best = 1000
+    prevstar = 1000
+    qstar = np.zeros(totalthesis,"uint8")
+    mstar = np.zeros(totalthesis,"bool")
+    same = 0
+    while True:
+        for thesis in range(totalthesis):
+            for mult in range(2):
+                for entry in range(4):
+                    if entry == 3:
+                        qprime = 255
+                    else:
+                        qprime = entry
+                    zwischen[thesis][mult][entry] = norm(calculate_percentages_prime(thesis,q,m,qprime,mprime),goal)
+                mprime = not mprime
+        ind = np.argmin(zwischen)
+        ind = np.unravel_index(ind,zwischen.shape)
+        print("change @ ",ind[0])
+        prevbest = best
+        best = zwischen[ind]
+        print("dist = ",best)
+        if best == 0:
+            return (q,m)
+        if best == prevbest:
+            print("permute")
+            if prevstar < best:
+                print("prev was better")
+
+                (q,m) = random_permute(np.copy(qstar),np.copy(mstar),5+2*same)
+                same +=1
+                print("samestrak = ",same)
+            else:
+                print("new best")
+                qstar = np.copy(q)
+                mstar = np.copy(m)
+                same = 0
+                (q,m) = random_permute(q,m,5+2*same)
+                prevstar = best
+        t = ind[2]
+        if ind[2] == 3:
+            t = 255
+        q[ind[0]] = t
+        m[ind[1]] = ind[1]
+
+    
+
+
+## Linalg solver
+#def evaluation_operator(q,m):
+#    return calulate_all_percentages(q,m)
+#
+#def getbasis():
+#    basis = np.stack(np.zeros(totalthesis,dtype="uint8"),np.zeros(totalthesis,dtype="bool"))
+#    for mult in range(2):
+#        for belief in range(totalthesis):
+#            basis
+#
+#
+#def linalg_solver(q,m,goal):
+#    for mult in range(2):
+
+
+
+
+(qg,mg) =  hundred_percent_n_partys([1,4])
+
+#fill_out.fill_out(qg,mg)
 qg = random_beliefs()
 mg = random_multipliers()
 goal = calulate_all_percentages(qg,mg)
@@ -241,6 +339,8 @@ N = 30
 qprime = np.array(q,copy=True)
 mprime = np.array(m,copy=True)
 
+(qprime,mprime) = morebruteforcesolver(q,m,goal)
+
 #for i in range(N):
 #    (qprime,mprime) = solve(np.array(qprime,copy=True),np.array(mprime,copy=True),goal,i,N)
 #    print(i,"--------------")
@@ -252,8 +352,8 @@ mprime = np.array(m,copy=True)
 #        print(round(goal[i]*100,1),round(perc[i]*100,1))
 #    
 #    switch_n_bools(m,int((totalthesis-totalthesis*(N-i)**2/(N**2))/3))
-
-(qprime,mprime) = better_solve(np.array(qprime,copy=True),np.array(mprime,copy=True),goal)
+#    
+#(qprime,mprime) = better_solve(np.array(qprime,copy=True),np.array(mprime,copy=True),goal)
 
 
 
